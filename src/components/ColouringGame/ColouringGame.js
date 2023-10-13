@@ -14,6 +14,14 @@ class ColouringGame {
   }
   // 游戏框架初始化
   init ({container, width, height}) {
+    // 配置
+    this.config = {
+      gameConfig: {
+        gameColors: {
+          selectedBorderColor: '#0000ff'
+        }
+      }
+    }
     // 创建画布
     this.canvas = this.createCanvas(width, height)
     // canvas2d context
@@ -122,12 +130,16 @@ ColouringGame.prototype.createPart = function ({name, x, y, w, h, image}) {
     w,
     h,
     image,
+    selectedBorderColor: this.config.gameConfig.gameColors.selectedBorderColor,
     context: this.context,
+    render () {},
     onClick () {
       console.log('当点击零件', {
         part
       });
+      // this.isSelected = true
       self.currentSelectedPart = part
+      this.select();
     }
   })
   return part;
@@ -854,6 +866,14 @@ class Node {
     this.onClick = options.onClick
     this.id = options.id || getUUid();
     this.name = options.name || ''
+    this.x = options.x
+    this.y = options.y
+    this.width = options.w
+    this.height = options.h
+    this.zIndex = options.zIndex || 0
+    this.parent = options.parent || null
+    this.children = options.children || []
+    this.context = options.context
     // this.addEvents()
   }
   on(eventName, callback) {
@@ -864,6 +884,11 @@ class Node {
   }
   emit(eventName, ...args) {
     this.events.emit(eventName, ...args)
+  }
+
+  addChild (node) {
+    this.children.push(node)
+    node.parent = this
   }
   // addEvents () {
   //   if (this.onClick) {
@@ -882,6 +907,7 @@ class Sprite extends Node {
     this.y = options.y
     this.width = options.w
     this.height = options.h
+    this.originImage = options.image
     this.image = options.image
     this.context = options.context
     this.onClick = options.onClick
@@ -891,19 +917,255 @@ class Sprite extends Node {
   }
 }
 
+// 像素点
+class Pixel {
+  constructor (options) {
+    this.x = options.x;
+    this.y = options.y;
+    // this.rgba = options.rgba;
+    // this.r = options.r;
+    // this.g = options.g;
+    // this.b = options.b;
+    // this.a = options.a;
+    this.color = {}
+    this.init(options);
+  }
+  // 是不是透明
+  get isTransparent () {
+    let flag = false;
+    if (this.color) {
+      flag = this.color.isTransparent()
+    }
+    return flag
+  }
+  get r () {
+    return this.color.r
+  }
+  get g () {
+    return this.color.g
+  }
+  get b () {
+    return this.color.b
+  }
+  get a () {
+    return this.color.a
+  }
+  init ({r,g,b,a,hex,opacity}) {
+    this.color = new Color({
+      r,
+      g,
+      b,
+      a
+    })
+  }
+  // 改变像素颜色
+  changeColor ({r,g,b,a,hex,opacity}) {
+    if (!this.color) {
+      this.color = new Color({r,g,b,a,hex,opacity})
+    }
+    this.color.changeColor({r,g,b,a,hex,opacity})
+  }
+
+}
+class ImageDataManager {
+  constructor (options) {
+    this.imageData = options.imageData
+    this.width = options.width
+    this.height = options.height
+    this.uint8ClampedArray = this.imageData.data
+    this.pixels = null // 二维数组 第一维是横坐标 第二维是纵坐标
+    this.pixelCount = 0
+    this.pixelIndex = 0
+    this.createPixelArr = []
+    this.borderPixels = []
+    this.init()
+  }
+  init () {
+    this.pixelIndex = 0
+    // 生成像素点数组
+    this.pixels = this.initPixel()
+    this.pixelCount = this.pixels.length / 4
+    // 获取边框像素数组
+    this.borderPixels = this.getBorderPixels()
+  }
+  // 生成像素点数组
+  initPixel () {
+    let pixels = []
+    const uint8ClampedArray = this.uint8ClampedArray
+    if (Object.prototype.toString.call(uint8ClampedArray) === '[object Uint8ClampedArray]') {
+      let y = 0
+      let x = 0
+      let pixelIndex = 0
+      let pixel = null
+      for(let q = 0; q < uint8ClampedArray.length; q += 4) {
+        // 算出当前横坐标
+        pixelIndex = q / 4
+        x = pixelIndex % this.width
+        y = Math.floor(pixelIndex / this.width)
+        pixel = new Pixel({
+          x,
+          y,
+          r: uint8ClampedArray[q],
+          g: uint8ClampedArray[q + 1],
+          b: uint8ClampedArray[q + 2],
+          a: uint8ClampedArray[q + 3]
+        })
+        if (!Array.isArray(pixels[y])) {
+          pixels[y] = []
+        }
+        pixels[y][x] = pixel
+      }
+    }
+    return pixels
+  }
+  // 遍历像素数组
+  forEachPixel (fn) {
+    let pixelIndex = 0
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        pixelIndex++
+        fn(this.pixels[y][x], pixelIndex, this)
+      }
+    }
+    return this
+  }
+  // 判断某一个像素是否紧挨着透明像素
+  isAdjacentTransparent (pixel) {
+    let pixelAbove = this.getPixel(pixel.x, pixel.y - 1)
+    let pixelBelow = this.getPixel(pixel.x, pixel.y + 1)
+    let pixelLeft = this.getPixel(pixel.x - 1, pixel.y)
+    let pixelRight = this.getPixel(pixel.x + 1, pixel.y)
+    return pixelAbove && pixelAbove.isTransparent ||
+      pixelBelow && pixelBelow.isTransparent ||
+      pixelLeft && pixelLeft.isTransparent ||
+      pixelRight && pixelRight.isTransparent
+  }
+  getPixel (x, y) {
+    if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
+      return null
+    }
+    return this.pixels[y][x]
+  }
+
+  // 获取边框像素集合
+  getBorderPixels () {
+    let borderPixels = []
+    this.forEachPixel((pixel, pixelIndex) => {
+      console.log({
+        pixel,
+        color: pixel.color,
+        a: pixel.color.a,
+        isTransparent: pixel.isTransparent,
+      });
+      // 一个非透明的像素点周围有透明像素点，我们认为是边框
+      if (!pixel.isTransparent && this.isAdjacentTransparent(pixel)) {
+        borderPixels.push(pixel)
+      }
+    })
+    console.log('边框像素集合', borderPixels);
+    return borderPixels
+  }
+
+  /**
+   * 给边框上色
+   * @param {*} color hex
+   */
+  colorizeBorder ({color}) {
+    this.borderPixels.forEach((borderPixel) => {
+      borderPixel.changeColor({
+        hex: color
+      })
+    })
+  }
+
+  /**
+   * 获取当前点阵数组
+   */
+  getImageData () {
+    const self = this;
+    let uint8ClampedArray = this.uint8ClampedArray
+    let pixels = this.pixels
+    let x = 0
+    let y = 0
+    let unitIndex = 0;
+    let xPixelArr = []
+    let pixel = null
+    for (y = 0; y < self.height; y++) {
+      xPixelArr = pixels[y]
+      for (x = 0; x < self.width; x++) {
+        pixel = xPixelArr[x]
+        unitIndex = y * self.width + x * 4
+        uint8ClampedArray[unitIndex] = pixel.r
+        uint8ClampedArray[unitIndex + 1] = pixel.g
+        uint8ClampedArray[unitIndex + 2] = pixel.b
+        uint8ClampedArray[unitIndex + 3] = pixel.a
+      }
+    }
+    return this.imageData
+  }
+
+}
 // 零件
 class Part extends Sprite {
   constructor(options) {
     super(options)
-    this.fillColor = null;
+    this.fillColor = null
+    this.selectedBorderColor = options.selectedBorderColor || '#000000'
+    this.isSelected = false
     this.addEvents()
   }
-  // addEvents () {
-  //   this.on('click', this.click)
-  // }
-  // click () {
+  draw () {
+    // 画一条虚线，用来示意选中
+    if (this.isSelected) {
+      this.lineDash()
+    }
+    super.draw()
+  }
+  // 给图片加上虚线边框
+  lineDash () {
+    if (!this.image) {
+      return
+    }
+    const img = this.image
+    const c=document.createElement("canvas");
+    const txt= c.getContext("2d");
+    c.width=img.width;
+    c.height=img.height;
+    txt.drawImage(img,0,0);
+    // 获取图像点阵
+    let imageData = txt.getImageData(0, 0, c.width, c.height)
+    // 创建图像点阵管理器
+    let imageDataManager = new ImageDataManager({
+      imageData: imageData,
+      width: imageData.width,
+      height: imageData.height
+    })
 
-  // }
+    imageDataManager.colorizeBorder({
+      color: this.selectedBorderColor
+    });
+
+    // 获取当前图片点阵
+    let newImageData = imageDataManager.getImageData()
+    
+    txt.putImageData(newImageData,0,0)
+    this.image = c
+  }
+
+  // 根据某一个像素点获取坐标
+  getPixelPosition ({pixel, imageData}) {
+
+  }
+  // 判断当前点是不是边缘
+  isBorderPixel ({pixel, }) {
+
+  }
+
+  // 选中，然后可以填充颜色
+  select () {
+    this.isSelected = true
+    this.draw()
+  }
   // 改变颜色
   changeColor ({color}) {
     this.fillColor = color;
@@ -947,22 +1209,42 @@ class Part extends Sprite {
 
 // 颜色
 class Color {
-  constructor ({hex, r, g, b}) {
+  constructor ({hex, opacity, r, g, b, a}) {
     this.hex = hex
+    this.opacity = opacity
     this.r = r
     this.g = g
     this.b = b
+    this.a = a
     this.init()
   }
   init () {
+    let {hex, opacity, r, g, b, a} = this
     // 如果有16进制，则算出rgb
-    if (this.hex) {
-      this.r = hexToDec(this.hex.substr(1, 2));
-      this.g = hexToDec(this.hex.substr(3, 2));
-      this.b = hexToDec(this.hex.substr(5, 2));
-    } else {
-      // 如果有rgb，则算出16进制
-      this.hex = '#' + decToHex(this.r) + decToHex(this.g) + decToHex(this.b);
+    this.changeColor({hex, opacity, r, g, b, a})
+  }
+  // 是不是透明
+  isTransparent () {
+    return this.a === 0
+  }
+  // 改变颜色
+  changeColor ({hex, opacity, r, g, b, a}) {
+    if (hex) {
+      this.hex = hex
+      this.r = hexToDec(hex.substr(1, 2));
+      this.g = hexToDec(hex.substr(3, 2));
+      this.b = hexToDec(hex.substr(5, 2));
+      this.a = typeof opacity === 'number' ? Math.floor(opacity * 255) : 255
+    } else if (typeof r === 'number'
+      && typeof g === 'number'
+      && typeof b === 'number') {
+        this.r = r
+        this.g = g
+        this.b = b
+        this.a = typeof a === 'number' ? a : 255
+        // 如果有rgb，则算出16进制
+        this.hex = '#' + decToHex(r) + decToHex(g) + decToHex(b);
+        this.opacity = typeof a === 'number' ? Math.floor(a / 255) : 1
     }
   }
 }

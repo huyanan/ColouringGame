@@ -5,6 +5,23 @@ let gameData = {
   id: '', // 游戏id
   name: '填色游戏',
   description: '简单填色游戏',
+  config: {
+    // 游戏配置
+    gameConfig: {
+      // 游戏类型
+      // gameType: 'colouring',
+      // 游戏模式
+      // gameMode: 'single',
+      // 游戏难度
+      // gameDifficulty: 'normal',
+      // 游戏时间
+      // gameTime: 10,
+      // 游戏颜色
+      gameColors: {
+        selectedBorderColor: '#0000ff'
+      }
+    }
+  },
   // 颜料盘
   colors: [
     '#FFFAEE',
