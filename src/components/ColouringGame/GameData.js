@@ -38,7 +38,7 @@ let gameData = {
       exampleImg: '/assets/exp/A.png',
       backplace: {
         id: '0',
-        image: require('@/assets/ITEMimg/i1/ITEM.jpg'),
+        imageUrl: require('@/assets/ITEMimg/i1/ITEM.jpg'),
         style: {
           x: 0,
           y: 0,
@@ -51,7 +51,7 @@ let gameData = {
           id: '1',
           name: '车架',
           description: '骑车车架',
-          image: require('@/assets/ITEMimg/i1/1.png'),
+          imageUrl: require('@/assets/ITEMimg/i1/1.png'),
           style: {
             x:10,
             y:39,
@@ -63,7 +63,7 @@ let gameData = {
           id: '2',
           name: '前车窗',
           description: '前车窗',
-          image: require('@/assets/ITEMimg/i1/2.png'),
+          imageUrl: require('@/assets/ITEMimg/i1/2.png'),
           style: {
             x:113,
             y:87,
@@ -75,7 +75,7 @@ let gameData = {
           id: '3',
           name: '侧车窗',
           description: '侧车窗',
-          image: require('@/assets/ITEMimg/i1/3.png'),
+          imageUrl: require('@/assets/ITEMimg/i1/3.png'),
           style: {
             x:309,
             y:90,
@@ -87,7 +87,7 @@ let gameData = {
           id: '4',
           name: '前右车灯',
           description: '前右车灯',
-          image: require('@/assets/ITEMimg/i1/4.png'),
+          imageUrl: require('@/assets/ITEMimg/i1/4.png'),
           style: {
             x:23,
             y:255,
@@ -99,7 +99,7 @@ let gameData = {
           id: '5',
           name: '前左车灯',
           description: '前左车灯',
-          image: require('@/assets/ITEMimg/i1/5.png'),
+          imageUrl: require('@/assets/ITEMimg/i1/5.png'),
           style: {
             x:197,
             y:265,
@@ -111,7 +111,7 @@ let gameData = {
           id: '6',
           name: '前车保险杠',
           description: '前车保险杠',
-          image: require('@/assets/ITEMimg/i1/6.png'),
+          imageUrl: require('@/assets/ITEMimg/i1/6.png'),
           style: {
             x:3,
             y:357,
@@ -123,7 +123,7 @@ let gameData = {
           id: '7',
           name: '轮胎',
           description: '轮胎',
-          image: require('@/assets/ITEMimg/i1/7.png'),
+          imageUrl: require('@/assets/ITEMimg/i1/7.png'),
           style: {
             x:86,
             y:292,

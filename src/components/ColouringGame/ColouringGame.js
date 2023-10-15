@@ -13,7 +13,7 @@ class ColouringGame {
     this.init(options)
   }
   // 游戏框架初始化
-  init ({container, width, height}) {
+  init ({container, width, height, onClickPart}) {
     // 配置
     this.config = {
       gameConfig: {
@@ -46,6 +46,8 @@ class ColouringGame {
     this.palette = new Palette()
     // 当前选中零件
     this.currentSelectedPart = null
+    // 点击零件
+    this.onClickPart = onClickPart
     // 追加事件
     this.addEvents()
   }
@@ -104,7 +106,7 @@ ColouringGame.prototype.createAssetsManager = function() {
 // 加载资源
 ColouringGame.prototype.loadAssets = async function(assetsInfoList) {
   const loadImagesRes = await this.assetsManager.loadImages(assetsInfoList);
-  console.log('loadAssets', loadImagesRes);
+  console.log('loadAssets', loadImagesRes); 
   return loadImagesRes
 }
 
@@ -140,6 +142,9 @@ ColouringGame.prototype.createPart = function ({name, x, y, w, h, image}) {
       // this.isSelected = true
       self.currentSelectedPart = part
       this.select();
+      if (typeof self.onClickPart === 'function') {
+        self.onClickPart(part)
+      }
     }
   })
   return part;
@@ -252,10 +257,11 @@ ColouringGame.prototype.changeDraw = async function (drawData) {
     } = drawData
     let imgsInfo = [];
     // 底板
+    let backplaceObj = null
     if (backplace) {
       imgsInfo.push({
         id: backplace.id,
-        url: backplace.image
+        url: backplace.imageUrl
       })
     }
     if (Array.isArray(parts)) {
@@ -263,7 +269,7 @@ ColouringGame.prototype.changeDraw = async function (drawData) {
       imgsInfo.push(...parts.map((partItem) => {
         return {
           id: partItem.id,
-          url: partItem.image
+          url: partItem.imageUrl
         }
       }))
     }
@@ -289,6 +295,7 @@ ColouringGame.prototype.changeDraw = async function (drawData) {
       const backplaceAsset = loadImagesRes.data.find((item) => {
         return item.id === backplace.id
       })
+      
       backplace.image = backplaceAsset.image
       // 格式化零件数据
       let imgAsset = null;
@@ -302,7 +309,11 @@ ColouringGame.prototype.changeDraw = async function (drawData) {
       this.drawBackPlace({id, backplace})
       // 绘制零件
       this.drawParts({parts})
-      // 
+      
+      console.log('游戏初始化完成', {
+        ColouringGame: this,
+        gameData: this.gameData
+      })
     }
   } catch (error) {
     console.error('切换图片失败', error);
@@ -311,6 +322,7 @@ ColouringGame.prototype.changeDraw = async function (drawData) {
 // 绘制底板
 ColouringGame.prototype.drawBackPlace = function ({id, backplace}) {
   try {
+
     this.backplaceSprite = this.createSprite({
       x: 0,
       y: 0,
@@ -438,6 +450,36 @@ ColouringGame.prototype.initPalette = function ({
 }
 
 /**
+ * 单独展示border
+ */
+ColouringGame.prototype.showPartBorder = function (part) {
+  const imageDataManager = part.imageDataManager
+  const borderPixels = part.border.borderPixels
+  if (!borderPixels) {
+    return;
+  }
+  let canvas = document.createElement('canvas')
+  let ctx = canvas.getContext('2d')
+  canvas.width = part.width
+  canvas.height = part.height
+
+  let imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+
+  let index = 0
+  borderPixels.forEach((borderPixel) => {
+    index = borderPixel.y * part.width * 4 + borderPixel.x * 4
+    imgData.data[index] = borderPixel.r
+    imgData.data[index + 1] = borderPixel.g
+    imgData.data[index + 2] = borderPixel.b
+    imgData.data[index + 3] = borderPixel.a
+  })
+
+  ctx.putImageData(imgData, 0, 0)
+
+  return canvas
+}
+
+/**
  * 资源管理器
  * 加载图片，给图片指定唯一标识，查找获取图片
  * 创建图片对象Image
@@ -451,16 +493,7 @@ class AssetsManager {
     this.taskListCollection = []
     this.taskListMap = {}
   }
-  // loadAssets (assetsInfoList) {
-  //   return new Promise((resolve, reject) => {
-  //     this.assets = assetsInfoList
-  //     this.assets.forEach(item => {
-  //       let task = this.createTask(item)
-  //       this.taskListCollection.push(task)
-  //       this.taskListMap[item.id] = task
-  //     })
-  //   }
-  // }
+
   async loadImage ({id, url}) {
     let imgAsset = new ImageAsset({id, url})
     let task = new Task({
@@ -966,6 +999,36 @@ class Pixel {
     this.color.changeColor({r,g,b,a,hex,opacity})
   }
 
+  // 判断两个点是不是同一个
+  isSameLocation (pixel) {
+    return this.isSameLocationBetweenPixels(this, pixel);
+  }
+
+  // 计算两个像素之间的距离
+  getDistance (pixel) {
+    return this.getDistanceBetweenTwoPixels(this, pixel)
+  }
+  static isSameLocationBetweenPixels (a, b) {
+    let flag = false
+    if (a && b) {
+      if (a === b) {
+        flag = true
+      } else {
+        const distance = Pixel.getDistanceBetweenTwoPixels(a, b)
+        flag = distance === 0
+      }
+
+    }
+    return flag
+  }
+  static getDistanceBetweenTwoPixels (a,b) {
+    let distance = 0;
+    const x = a.x - b.x
+    const y = a.y - b.y
+    distance = Math.sqrt(x * x + y * y)
+    return distance 
+  }
+
 }
 class ImageDataManager {
   constructor (options) {
@@ -985,9 +1048,41 @@ class ImageDataManager {
     // 生成像素点数组
     this.pixels = this.initPixel()
     this.pixelCount = this.pixels.length / 4
+    // this.initBorder()
+  }
+  // 初始化内边框
+  initBorder () {
     // 获取边框像素数组
     this.borderPixels = this.getBorderPixels()
+    // 获取边框图像
+
+    const imageDataManager = part.imageDataManager
+    const borderPixels = imageDataManager.borderPixels
+    if (!borderPixels) {
+      return;
+    }
+    this.borderCanvas = document.createElement('canvas')
+    ctx = canvas.getContext('2d')
+    canvas.width = part.width
+    canvas.height = part.height
+
+    let imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+
+    let index = 0
+    borderPixels.forEach((borderPixel) => {
+      index = borderPixel.y * part.width * 4 + borderPixel.x * 4
+      imgData.data[index] = borderPixel.r
+      imgData.data[index + 1] = borderPixel.g
+      imgData.data[index + 2] = borderPixel.b
+      imgData.data[index + 3] = borderPixel.a
+    })
+
+    ctx.putImageData(imgData, 0, 0)
+
+    return canvas
+
   }
+
   // 生成像素点数组
   initPixel () {
     let pixels = []
@@ -1051,20 +1146,121 @@ class ImageDataManager {
   getBorderPixels () {
     let borderPixels = []
     this.forEachPixel((pixel, pixelIndex) => {
-      console.log({
-        pixel,
-        color: pixel.color,
-        a: pixel.color.a,
-        isTransparent: pixel.isTransparent,
-      });
+      // console.log({
+      //   pixel,
+      //   color: pixel.color,
+      //   a: pixel.color.a,
+      //   isTransparent: pixel.isTransparent,
+      // });
       // 一个非透明的像素点周围有透明像素点，我们认为是边框
-      if (!pixel.isTransparent && this.isAdjacentTransparent(pixel)) {
+      
+      if (this.isBorderPixel(pixel)) {
         borderPixels.push(pixel)
       }
     })
-    console.log('边框像素集合', borderPixels);
+    // console.log('边框像素集合', borderPixels);
     return borderPixels
   }
+
+  // 判断是否是边缘节点
+  isBorderPixel (pixel) {
+    let flag = false;
+    // 自身不透明 且 (挨着透明节点 或 当前节点在最边上）
+    if (!pixel.isTransparent && (this.isAdjacentTransparent(pixel) || this.isContainerBorderPixel(pixel))) {
+      flag = true
+    }
+    return flag
+
+  }
+  // 判断某个像素是不是在容器最边上
+  isContainerBorderPixel (pixel) {
+    let flag = false;
+    if (pixel.x === 0 || pixel.x >= this.width - 1 || pixel.y === 0 || pixel.y >= this.height - 1) {
+      flag = true
+    }
+    return flag
+  }
+
+  /**
+   * 根据边框的像素点，画一条线
+   */
+  // getBorderLines () {
+  //   let borderLines = []
+
+  //   let canvas = document.createElement('canvas');
+  //   let ctx = canvas.getContext('2d');  
+  //   // 给边框像素排序，按最近的排
+  //   let linePixels = []
+  //   let line = null
+  //   let startPixel = this.borderPixels[0]
+  //   this.getNearestPixel(startPixel, );
+  //   let line
+  // }
+
+  /**
+   * 找出一条完整的边
+   */
+  getCompleteBorderLinePixels (startPixel, borderPixels) {
+    let linePixels = []
+    let nearestPixel = null
+    if (startPixel) {
+      linePixels.push(startPixel)
+      if (Array.isArray(borderPixels)) {
+        nearestPixel = this.getNearestPixel(startPixel, borderPixels)
+      }
+    }
+  }
+  
+
+  /**
+   * 找出某个像素点最近的像素点
+   */
+  getNearestPixel (referPixel, pixelArr) {
+    let nearestPixel = null
+    let minDistance = null
+    let distance = null
+    pixelArr.forEach((pixel) => {
+      distance = Pixel.getDistanceBetweenTwoPixels(referPixel, pixel)
+      if (!minDistance) {
+        minDistance = distance
+      }
+      if (distance < minDistance) {
+        minDistance = distance
+        nearestPixel = pixel
+      }
+    })
+    return nearestPixel
+  }
+
+  /**
+   * 获取一个像素周围九宫格
+   */
+  getPixelNeighbors (pixel) {
+    let neighbors = []
+    let pixelAbove = this.getPixel(pixel.x, pixel.y - 1)
+    let pixelBelow = this.getPixel(pixel.x, pixel.y + 1)
+    let pixelLeft = this.getPixel(pixel.x - 1, pixel.y)
+    let pixelRight = this.getPixel(pixel.x + 1, pixel.y)
+    if (pixelAbove) {
+      neighbors.push(pixelAbove)
+    }
+    if (pixelBelow) {
+      neighbors.push(pixelBelow)
+    }
+    if (pixelLeft) {
+      neighbors.push(pixelLeft)
+    }
+    if (pixelRight) {
+      neighbors.push(pixelRight)
+    }
+    return neighbors
+  }
+
+  static getPixelByPixelArr ({x, y, pixelArr}) {
+    
+  }
+
+
 
   /**
    * 给边框上色
@@ -1094,7 +1290,7 @@ class ImageDataManager {
       xPixelArr = pixels[y]
       for (x = 0; x < self.width; x++) {
         pixel = xPixelArr[x]
-        unitIndex = y * self.width + x * 4
+        unitIndex = y * self.width * 4 + x * 4
         uint8ClampedArray[unitIndex] = pixel.r
         uint8ClampedArray[unitIndex + 1] = pixel.g
         uint8ClampedArray[unitIndex + 2] = pixel.b
@@ -1109,10 +1305,46 @@ class ImageDataManager {
 class Part extends Sprite {
   constructor(options) {
     super(options)
+    this.image = options.image
+    // this.width = options.width
+    // this.height = options.height
     this.fillColor = null
     this.selectedBorderColor = options.selectedBorderColor || '#000000'
     this.isSelected = false
+    this.init()
     this.addEvents()
+  }
+  init () {
+    if (!this.image) {
+      return
+    }
+    const img = this.image
+    const c=document.createElement("canvas");
+    const txt= c.getContext("2d");
+    c.width=img.width;
+    c.height=img.height;
+    txt.drawImage(img,0,0);
+    // 获取图像点阵
+    let imageData = txt.getImageData(0, 0, c.width, c.height)
+    // 创建图像点阵管理器
+    this.imageDataManager = new ImageDataManager({
+      imageData: imageData,
+      width: imageData.width,
+      height: imageData.height,
+      // initBorderPixels: true
+    })
+    // 初始化边框
+    this.initBorder()
+  }
+  initBorder () {
+    // 获取边框像素数组
+    const borderPixels = this.imageDataManager.getBorderPixels()
+    this.border = new Border({
+      width: this.width,
+      height: this.height,
+      borderPixels
+    })
+
   }
   draw () {
     // 画一条虚线，用来示意选中
@@ -1135,30 +1367,22 @@ class Part extends Sprite {
     // 获取图像点阵
     let imageData = txt.getImageData(0, 0, c.width, c.height)
     // 创建图像点阵管理器
-    let imageDataManager = new ImageDataManager({
+    this.imageDataManager = new ImageDataManager({
       imageData: imageData,
       width: imageData.width,
       height: imageData.height
     })
 
-    imageDataManager.colorizeBorder({
+    this.imageDataManager.colorizeBorder({
       color: this.selectedBorderColor
     });
 
     // 获取当前图片点阵
-    let newImageData = imageDataManager.getImageData()
+    let newImageData = this.imageDataManager.getImageData()
     
     txt.putImageData(newImageData,0,0)
+
     this.image = c
-  }
-
-  // 根据某一个像素点获取坐标
-  getPixelPosition ({pixel, imageData}) {
-
-  }
-  // 判断当前点是不是边缘
-  isBorderPixel ({pixel, }) {
-
   }
 
   // 选中，然后可以填充颜色
@@ -1204,6 +1428,60 @@ class Part extends Sprite {
     if (this.onClick) {
       this.on('click', this.onClick.bind(this))
     }
+  }
+}
+
+class Border {
+  constructor (options) {
+    this.options = options
+    this.width = options.width
+    this.height = options.height
+    this.color = null
+    this.borderPixels = options.borderPixels || []
+    this.canvas = null
+    this.ctx = null
+    this.imageData = null
+    this.init()
+  }
+  init () {
+    const borderPixels = this.borderPixels
+    // 获取边框图像
+    if (!borderPixels) {
+      return;
+    }
+    this.borderCanvas = document.createElement('canvas')
+    this.ctx = this.borderCanvas.getContext('2d')
+    this.borderCanvas.width = this.width
+    this.borderCanvas.height = this.height
+
+    this.imageData = this.ctx.getImageData(0, 0, this.borderCanvas.width, this.borderCanvas.height)
+
+    let index = 0
+    borderPixels.forEach((borderPixel) => {
+      index = borderPixel.y * this.width * 4 + borderPixel.x * 4
+      this.imageData.data[index] = borderPixel.r
+      this.imageData.data[index + 1] = borderPixel.g
+      this.imageData.data[index + 2] = borderPixel.b
+      this.imageData.data[index + 3] = borderPixel.a
+    })
+
+    this.ctx.putImageData(this.imageData, 0, 0)
+
+    this.imageDataManager = new ImageDataManager({
+      imageData: this.imageData,
+      width: this.imageData.width,
+      height: this.imageData.height,
+    })
+
+    // TODO 处理边框像素集合，最终得到一个或多个可连线的边框像素集合
+  }
+  changeColor(color) {
+    this.canvas = this.imageDataManager.changeColor({
+      color
+    })
+  }
+  draw () {
+    this.ctx.putImageData(this.imageData, 0, 0)
   }
 }
 

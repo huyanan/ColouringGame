@@ -1,6 +1,9 @@
 <template>
   <div class="colouring-game">
     <div class="game-container" ref="gameContainer"></div>
+    <div class="border-view" ref="borderView">
+
+    </div>
     <div class="color-palette">
       <div
         class="color"
@@ -22,6 +25,7 @@ export default {
     return {
       colors: [],
       palette: null,
+      colouringGame: null
     }
   },
   mounted () {
@@ -29,13 +33,21 @@ export default {
   },
   methods: {
     init () {
+      const self = this
       const gameContainer = this.$refs.gameContainer
 
       // 初始化游戏框架
       this.colouringGame = new ColouringGame({
         container: gameContainer,
-        width: 800,
-        height: 800,
+        width: 500,
+        height: 500,
+        onClickPart (part) {
+          console.log('onClickPart', {
+            part
+          })
+          const canvas = this.showPartBorder(part)
+          self.$refs.borderView.replaceChildren(canvas) 
+        }
       })
       console.log('游戏框架初始化完成', {
         colouringGame: this.colouringGame,
@@ -58,7 +70,8 @@ export default {
       this.colouringGame.changeCurrentPartColor({
         color
       })
-    }
+    },
+
   }
 }
 </script>
