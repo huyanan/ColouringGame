@@ -1,6 +1,10 @@
 <template>
   <div class="colouring-game">
     <div class="game-container" ref="gameContainer"></div>
+    <div class="debug">
+      <div class="prev-distance">{{ debug.prevDistance }}</div>
+      <div class="current-distance">{{ debug.currentDistance }}</div>
+    </div>
     <div class="border-view" ref="borderView">
 
     </div>
@@ -25,10 +29,20 @@ export default {
     return {
       colors: [],
       palette: null,
-      colouringGame: null
+      colouringGame: null,
+      debug: {
+        prevDistance: 0,
+        currentDistance: 0,
+      }
     }
   },
   mounted () {
+    document.body.addEventListener('touchmove', function (event) {
+      event.preventDefault();
+    })
+    document.addEventListener('gesturestart', function (event) {
+      event.preventDefault()
+    })
     this.init()
   },
   methods: {
@@ -41,6 +55,7 @@ export default {
         container: gameContainer,
         width: 500,
         height: 500,
+        debug: this.debug,
         onClickPart (part) {
           console.log('onClickPart', {
             part

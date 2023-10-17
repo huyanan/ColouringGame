@@ -13,15 +13,18 @@ class ColouringGame {
     this.init(options)
   }
   // 游戏框架初始化
-  init ({container, width, height, onClickPart}) {
+  init ({container, width, height, onClickPart, config, debug}) {
     // 配置
     this.config = {
-      gameConfig: {
-        gameColors: {
-          selectedBorderColor: '#0000ff'
-        }
-      }
+      gameColors: {
+        selectedBorderColor: '#0000ff'
+      },
+      maxScale: 8,
+      minScale: 0.4,
+      scaleStep: 0.1,
+      ...config
     }
+    this.debug = debug
     // 创建画布
     this.canvas = this.createCanvas(width, height)
     // canvas2d context
@@ -29,6 +32,12 @@ class ColouringGame {
     // 坐标偏移
     this.offsetX = 0
     this.offsetY = 0
+    // 缩放
+    this.scale = 1
+    this.maxScale = this.config.maxScale || 8; // 缩放最大倍数（缩放比率倍数）
+    this.minScale = this.config.minScale || 0.4; // 缩放最小倍数（缩放比率倍数）
+    // 缩放 scaleStep
+    this.scaleStep = this.config.scaleStep || 0.2
     // 游戏画布的容器
     this.container = container
     // 将画布追加到容器中
@@ -96,6 +105,8 @@ class ColouringGame {
   render () {
     const self = this;
     this.clear();
+    this.context.translate(this.offsetX, this.offsetY)
+    this.context.scale(this.scale, this.scale)
     this.context.beginPath();
     function renderChildren (node) {
       if (Array.isArray(node.children)) {
@@ -111,7 +122,11 @@ class ColouringGame {
     window.requestAnimationFrame(this.render.bind(this))
   }
   clear () {
-    this.context.clearRect(0,0,this.canvas.width, this.canvas.height);
+    let size = 10000000
+    // this.context.clearRect(this.offsetX * -1,this.offsetY * -1,this.canvas.width, this.canvas.height);
+    // this.context.clearRect(size*-1,size*-1,size*2, size*2);
+    this.canvas.width = this.canvas.width;
+
   };
   draw (node) {
     if(node.image){
@@ -123,6 +138,34 @@ class ColouringGame {
   }
 }
 
+// 移动视角
+ColouringGame.prototype.moveCamera= function (x,y) {
+  this.context.translate(x, y)
+  this.offsetX += x;
+  this.offsetY += y;
+  // this.context.setTransform(0, 0, 0, 0, x, y);
+}
+ColouringGame.prototype.zoomIn= function () {
+  // this.context.translate(x, y)
+  // this.offsetX += x;
+  // this.offsetY += y;
+  // this.context.setTransform(0, 0, 0, 0, x, y);
+  this.scale += this.scaleStep;
+  if (this.scale > this.maxScale) {
+    this.scale = this.maxScale;
+  }
+}
+ColouringGame.prototype.zoomOut= function () {
+  // this.context.translate(x, y)
+  // this.offsetX += x;
+  // this.offsetY += y;
+  // this.context.setTransform(0, 0, 0, 0, x, y);
+  this.scale -= this.scaleStep;
+  if (this.scale < this.minScale) {
+    this.scale = this.minScale;
+  }
+  
+}
 
 
 
@@ -168,7 +211,7 @@ ColouringGame.prototype.createPart = function ({name, x, y, w, h, image}) {
     w,
     h,
     image,
-    selectedBorderColor: this.config.gameConfig.gameColors.selectedBorderColor,
+    selectedBorderColor: this.config.gameColors.selectedBorderColor,
     context: this.context,
     render () {},
     onClick () {
@@ -424,9 +467,6 @@ ColouringGame.prototype.createPartsSprite = function ({parts}) {
       //   backplaceSprite: this.backplaceSprite
       // });
     })
-
-    // 零件监听事件
-    // this.addEvents();
   } catch (error) {
     console.error('绘制底板失败', error);
   }
@@ -508,18 +548,31 @@ ColouringGame.prototype.addEvents = function () {
     x: 0,
     y: 0
   }
+  // 触摸点1
+  let touch1 = null
+  let touch2 = null
+  // 两个触摸点的距离
+  let distanceBetweenTwoTouchPoints = 0;
+  // 触摸点2
   this.canvas.addEventListener("touchstart", function (e) {
+    var event=typeof window.event!="undefined"?window.event:typeof e!="undefined"?e:event;
     self.isMoving = true;
-    
+    // 记录鼠标位置
+    self.mouseLocation.x = event.touches[0].clientX;
+    self.mouseLocation.y = event.touches[0].clientY;
+
+    if (event.touches.length === 2) {
+      distanceBetweenTwoTouchPoints = canvasUtils.getDistance(event.touches[0].clientX, event.touches[0].clientY, event.touches[1].clientX, event.touches[1].clientY)
+      if (this.debug) {
+        this.debug.prevDistance = distanceBetweenTwoTouchPoints
+        this.debug.currentDistance = distanceBetweenTwoTouchPoints
+      }
+    }
   })
   this.canvas.addEventListener("touchmove", function (e) {
-    
-    console.log('鼠标开始移动', {
-      x: self.mouseLocation.x,
-      y: self.mouseLocation.y
-    });
-    if (self.isMoving) {
-      var event=typeof window.event!="undefined"?window.event:typeof e!="undefined"?e:event;
+    var event=typeof window.event!="undefined"?window.event:typeof e!="undefined"?e:event;
+    // 判断如果是一个触摸点，则为移动，两个触摸点则为缩放
+    if (event.touches.length === 1) {
       var x =event.touches[0].clientX;
       var y =event.touches[0].clientY;
       // 计算鼠标偏移
@@ -537,35 +590,53 @@ ColouringGame.prototype.addEvents = function () {
       // 记录鼠标位置
       self.mouseLocation.x = x;
       self.mouseLocation.y = y;
-      // var aX=0;
-      // var aY=0;
-      // var buf=null;
-      // for(var i =0;i<self.parts.length;i++){
-      //   buf=self.parts[i];
-      //   if(x>buf.x&&x<buf.x+buf.width&&y>buf.y&&y<buf.y+buf.height){
-      //       if(buf.image){
-      //           aX=x-buf.x;
-      //           aY=y-buf.y;
-      //           if(dataInfo(buf,aX,aY)>80){
-      //               buf.emit('click')
-      //           }
-      //       }
-      //       break;
-      //   }
-      // }
+      if (self.debug) {
+        self.debug.currentDistance = 100
+      }
+    } else if (event.touches.length === 2) {
+      // 得到
+      let currentDistanceBetweenTwoTouchPoints = canvasUtils.getDistance(event.touches[0].clientX, event.touches[0].clientY, event.touches[1].clientX, event.touches[1].clientY)
+      if (self.debug) {
+        self.debug.currentDistance = currentDistanceBetweenTwoTouchPoints
+      }
+      if (currentDistanceBetweenTwoTouchPoints > distanceBetweenTwoTouchPoints) {
+        // 如果距离变大，则为放大画布
+        self.zoomIn()
+      } else if (currentDistanceBetweenTwoTouchPoints < distanceBetweenTwoTouchPoints) {
+        // 距离变小，则为缩小画布
+        self.zoomOut()
+      }
+      distanceBetweenTwoTouchPoints = currentDistanceBetweenTwoTouchPoints
+      if (self.debug) {
+        self.debug.prevDistance = currentDistanceBetweenTwoTouchPoints
+      }
     }
+    
+    console.log('鼠标开始移动', {
+      x: self.mouseLocation.x,
+      y: self.mouseLocation.y
+    });
   })
   this.canvas.addEventListener("touchend", function (e) {
-    this.isMoving = false;
-    this.mouseLocation.x = 0;
-    this.mouseLocation.y = 0;
+    self.isMoving = false;
+    self.mouseLocation.x = 0;
+    self.mouseLocation.y = 0;
+    touch1 = null;
+    touch2 = null;
+  })
+  // 监听缩放
+  this.canvas.addEventListener("wheel", function (e) {
+    console.log('鼠标滚动', e);
+
+    const deltaY = e.deltaY;
+    if (deltaY < 0) {
+      self.zoomIn()
+    } else {
+      self.zoomOut()
+    }
   })
 }
-// 移动视角
-ColouringGame.prototype.moveCamera= function (x,y) {
-  this.context.translate(x, y)
-  this.context.setTransform(0, 0, 0, 0, x, y);
-}
+
 function dataInfo(Obj,x,y){
   var c=document.createElement("canvas");
   var txt= c.getContext("2d");
@@ -695,7 +766,7 @@ class AssetsManager {
           excutionFunc: imgAsset.load.bind(imgAsset)
         })
         taskList.addTask(task);
-        imgAsset.task = task // 索引任务对象，方便查看任务执行情况
+        // imgAsset.task = task // 索引任务对象，方便查看任务执行情况
         this.imageList.push(imgAsset)
         this.imageMap[item.id] = imgAsset
       })
@@ -1495,14 +1566,14 @@ class Part extends Sprite {
     // 获取图像点阵
     let imageData = txt.getImageData(0, 0, c.width, c.height)
     // 创建图像点阵管理器
-    this.imageDataManager = new ImageDataManager({
-      imageData: imageData,
-      width: imageData.width,
-      height: imageData.height,
-      // initBorderPixels: true
-    })
+    // this.imageDataManager = new ImageDataManager({
+    //   imageData: imageData,
+    //   width: imageData.width,
+    //   height: imageData.height,
+    //   // initBorderPixels: true
+    // })
     // 初始化边框
-    this.initBorder()
+    // this.initBorder()
   }
   initBorder () {
     // 获取边框像素数组
@@ -1783,6 +1854,14 @@ const canvasUtils = {
     return arr.sort((a, b) => {
       return a.zIndex - b.zIndex
     })
+  },
+  // 计算两个坐标的距离
+  getDistance (x1, y1, x2, y2) {
+    return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2))
+  },
+  // 计算两个坐标的角度
+  getAngle (x1, y1, x2, y2) {
+    return Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI
   }
 }
 export default ColouringGame
