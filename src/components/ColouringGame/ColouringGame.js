@@ -32,10 +32,20 @@ class ColouringGame {
     // 坐标偏移
     this.offsetX = 0
     this.offsetY = 0
+    // 当前偏移
+    this.curOffset = {
+      x: 0,
+      y: 0
+    }
     // 缩放
+    this.prevScale = 1
     this.scale = 1
     this.maxScale = this.config.maxScale || 8; // 缩放最大倍数（缩放比率倍数）
     this.minScale = this.config.minScale || 0.4; // 缩放最小倍数（缩放比率倍数）
+    this.mousePos = {
+      x: 0,
+      y: 0
+    }
     // 缩放 scaleStep
     this.scaleStep = this.config.scaleStep || 0.2
     // 游戏画布的容器
@@ -154,6 +164,7 @@ ColouringGame.prototype.zoomIn= function () {
   if (this.scale > this.maxScale) {
     this.scale = this.maxScale;
   }
+  this.zoom()
 }
 ColouringGame.prototype.zoomOut= function () {
   // this.context.translate(x, y)
@@ -164,7 +175,15 @@ ColouringGame.prototype.zoomOut= function () {
   if (this.scale < this.minScale) {
     this.scale = this.minScale;
   }
-  
+  this.zoom()
+}
+
+ColouringGame.prototype.zoom = function () {
+  this.offsetX = this.mousePos.x - ((this.mousePos.x - this.offsetX) * this.scale) / this.prevScale;
+  this.offsetY = this.mousePos.y - ((this.mousePos.y - this.offsetY) * this.scale) / this.prevScale;
+  this.prevScale = this.scale;
+  this.curOffset.x = this.offsetX;
+  this.curOffset.y = this.offsetY;
 }
 
 
@@ -520,15 +539,25 @@ ColouringGame.prototype.addEvents = function () {
     var buf=null;
     for(var i =0;i<self.parts.length;i++){
         buf=self.parts[i];
-        console.log('查找点击的零件', {
+        console.log(`零件 ${buf.name}`, {
           x,
           y,
+          offsetX: self.offsetX,
+          offsetY: self.offsetY,
+          scale: self.scale,
           bufx: buf.x,
+          bufxstart: buf.x * self.scale + self.offsetX,
+          bufxend: buf.x * self.scale + self.offsetX + buf.width * self.scale,
           bufy: buf.y,
+          bufystart: buf.y * self.scale + self.offsetY,
+          bufyend: buf.y * self.scale + self.offsetY + buf.height * self.scale,
           bufw: buf.width,
           bufh: buf.height,
         });
-        if(x>buf.x&&x<buf.x+buf.width&&y>buf.y&&y<buf.y+buf.height){
+        if(x>buf.x * self.scale + self.offsetX
+          && x<buf.x * self.scale + self.offsetX + buf.width * self.scale
+          && y>buf.y * self.scale + self.offsetY
+          && y<buf.y * self.scale + self.offsetY + buf.height * self.scale){
             if(buf.image){
                 aX=x-buf.x;
                 aY=y-buf.y;
@@ -573,23 +602,28 @@ ColouringGame.prototype.addEvents = function () {
     var event=typeof window.event!="undefined"?window.event:typeof e!="undefined"?e:event;
     // 判断如果是一个触摸点，则为移动，两个触摸点则为缩放
     if (event.touches.length === 1) {
-      var x =event.touches[0].clientX;
-      var y =event.touches[0].clientY;
-      // 计算鼠标偏移
-      var offsetX = x - self.mouseLocation.x;
-      var offsetY = y - self.mouseLocation.y;
-      console.log('鼠标偏移', {
-        offsetX,
-        offsetY,
-        mouseLocation: self.mouseLocation,
+      let x =event.touches[0].clientX;
+      let y =event.touches[0].clientY;
+      self.mousePos = {
         x,
         y
-      })
+      }
+      // 计算鼠标偏移
+      // var offsetX = x - self.mouseLocation.x;
+      // var offsetY = y - self.mouseLocation.y;
+      // console.log('鼠标偏移', {
+      //   offsetX,
+      //   offsetY,
+      //   mouseLocation: self.mouseLocation,
+      //   x,
+      //   y
+      // })
       // 设置画布平移
-      self.moveCamera(offsetX, offsetY)
-      // 记录鼠标位置
-      self.mouseLocation.x = x;
-      self.mouseLocation.y = y;
+      // self.moveCamera(offsetX, offsetY)
+      self.offsetX = self.curOffset.x + (x - self.mouseLocation.x)
+      self.offsetY = self.curOffset.y + (y - self.mouseLocation.y)
+
+      
       if (self.debug) {
         self.debug.currentDistance = 100
       }
@@ -623,12 +657,20 @@ ColouringGame.prototype.addEvents = function () {
     self.mouseLocation.y = 0;
     touch1 = null;
     touch2 = null;
+    self.curOffset = {
+      x: self.offsetX,
+      y: self.offsetY
+    }
   })
   // 监听缩放
   this.canvas.addEventListener("wheel", function (e) {
     console.log('鼠标滚动', e);
 
     const deltaY = e.deltaY;
+    self.mousePos = {
+      x: e.offsetX,
+      y: e.offsetY
+    }
     if (deltaY < 0) {
       self.zoomIn()
     } else {
