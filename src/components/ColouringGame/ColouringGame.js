@@ -26,6 +26,9 @@ class ColouringGame {
     this.canvas = this.createCanvas(width, height)
     // canvas2d context
     this.context = this.canvas.getContext('2d')
+    // 坐标偏移
+    this.offsetX = 0
+    this.offsetY = 0
     // 游戏画布的容器
     this.container = container
     // 将画布追加到容器中
@@ -48,6 +51,8 @@ class ColouringGame {
     this.currentSelectedPart = null
     // 点击零件
     this.onClickPart = onClickPart
+    // 渲染对象列表
+    this.children = []
     // 追加事件
     this.addEvents()
   }
@@ -76,14 +81,45 @@ class ColouringGame {
       this.initPalette({
         colors
       });
+
+      // 开始绘制
+      this.startRender()
     } catch (error) {
       console.error('游戏初始化失败', error)
     }
   }
+  startRender () {
+    this.render();
+  }
 
-  // 重绘
+  // 绘制
   render () {
-
+    const self = this;
+    this.clear();
+    this.context.beginPath();
+    function renderChildren (node) {
+      if (Array.isArray(node.children)) {
+        // 绘制列表
+        node.children.forEach(child => {
+          self.draw(child)
+          renderChildren(child)
+        })
+      }
+    }
+    renderChildren(this)
+    this.context.closePath();
+    window.requestAnimationFrame(this.render.bind(this))
+  }
+  clear () {
+    this.context.clearRect(0,0,this.canvas.width, this.canvas.height);
+  };
+  draw (node) {
+    if(node.image){
+      this.context.drawImage(node.image, node.x, node.y, node.width, node.height)
+    } else {
+        THIS.context.fillStyle= O.color;
+        THIS.context.fillRect(O.CONST_BUF_X, O.CONST_BUF_Y, O.w, O.h);
+    }
   }
 }
 
@@ -306,9 +342,16 @@ ColouringGame.prototype.changeDraw = async function (drawData) {
         partItem.image = imgAsset.image;
       })
       // 绘制底板
-      this.drawBackPlace({id, backplace})
+      // this.drawBackPlace({id, backplace})
+      // 创建底板精灵
+      this.backplaceSprite = this.createBackPlaceSprite({id, backplace})
+      this.children.push(this.backplaceSprite);
       // 绘制零件
-      this.drawParts({parts})
+      // this.drawParts({parts})
+      // 批量创建零件精灵
+      this.parts = this.createPartsSprite({parts})
+      this.parts = canvasUtils.sortNodeByZIndex(this.parts)
+      this.backplaceSprite.addChilds(this.parts)
       
       console.log('游戏初始化完成', {
         ColouringGame: this,
@@ -319,10 +362,30 @@ ColouringGame.prototype.changeDraw = async function (drawData) {
     console.error('切换图片失败', error);
   }
 }
+// 创建底板精灵
+ColouringGame.prototype.createBackPlaceSprite = function ({id, backplace}) {
+  let backplaceSprite = null
+  try {
+    backplaceSprite = this.createSprite({
+      x: 0,
+      y: 0,
+      w: 500,
+      h: 500,
+      image: backplace.image,
+      ...backplace.style
+    })
+    
+    console.log('drawBackPlace', {
+      backplaceSprite: this.backplaceSprite
+    });
+  } catch (error) {
+    console.error('绘制底板失败', error);
+  }
+  return backplaceSprite
+}
 // 绘制底板
 ColouringGame.prototype.drawBackPlace = function ({id, backplace}) {
   try {
-
     this.backplaceSprite = this.createSprite({
       x: 0,
       y: 0,
@@ -331,6 +394,8 @@ ColouringGame.prototype.drawBackPlace = function ({id, backplace}) {
       image: backplace.image,
       ...backplace.style
     })
+    // 把底板加到渲染列表中
+    this.children.push(this.backplaceSprite);
     console.log('drawBackPlace', {
       backplaceSprite: this.backplaceSprite
     });
@@ -339,6 +404,33 @@ ColouringGame.prototype.drawBackPlace = function ({id, backplace}) {
   } catch (error) {
     console.error('绘制底板失败', error);
   }
+}
+// 批量创建零件精灵
+ColouringGame.prototype.createPartsSprite = function ({parts}) {
+  let partSpriteList = []
+  try {
+    if (!Array.isArray(parts)) {
+      return;
+    }
+    let partSprite = null
+    parts.forEach((partItem) => {
+      partSprite = this.createPart({
+        name: partItem.name,
+        image: partItem.image,
+        ...partItem.style
+      })
+      partSpriteList.push(partSprite);
+      // console.log('drawBackPlace', {
+      //   backplaceSprite: this.backplaceSprite
+      // });
+    })
+
+    // 零件监听事件
+    // this.addEvents();
+  } catch (error) {
+    console.error('绘制底板失败', error);
+  }
+  return partSpriteList
 }
 // 绘制零件
 ColouringGame.prototype.drawParts = function ({parts}) {
@@ -409,6 +501,70 @@ ColouringGame.prototype.addEvents = function () {
         }
     }
   });
+  // 平移
+  this.isMoving = false;
+  // 鼠标移动前的坐标
+  this.mouseLocation = {
+    x: 0,
+    y: 0
+  }
+  this.canvas.addEventListener("touchstart", function (e) {
+    self.isMoving = true;
+    
+  })
+  this.canvas.addEventListener("touchmove", function (e) {
+    
+    console.log('鼠标开始移动', {
+      x: self.mouseLocation.x,
+      y: self.mouseLocation.y
+    });
+    if (self.isMoving) {
+      var event=typeof window.event!="undefined"?window.event:typeof e!="undefined"?e:event;
+      var x =event.touches[0].clientX;
+      var y =event.touches[0].clientY;
+      // 计算鼠标偏移
+      var offsetX = x - self.mouseLocation.x;
+      var offsetY = y - self.mouseLocation.y;
+      console.log('鼠标偏移', {
+        offsetX,
+        offsetY,
+        mouseLocation: self.mouseLocation,
+        x,
+        y
+      })
+      // 设置画布平移
+      self.moveCamera(offsetX, offsetY)
+      // 记录鼠标位置
+      self.mouseLocation.x = x;
+      self.mouseLocation.y = y;
+      // var aX=0;
+      // var aY=0;
+      // var buf=null;
+      // for(var i =0;i<self.parts.length;i++){
+      //   buf=self.parts[i];
+      //   if(x>buf.x&&x<buf.x+buf.width&&y>buf.y&&y<buf.y+buf.height){
+      //       if(buf.image){
+      //           aX=x-buf.x;
+      //           aY=y-buf.y;
+      //           if(dataInfo(buf,aX,aY)>80){
+      //               buf.emit('click')
+      //           }
+      //       }
+      //       break;
+      //   }
+      // }
+    }
+  })
+  this.canvas.addEventListener("touchend", function (e) {
+    this.isMoving = false;
+    this.mouseLocation.x = 0;
+    this.mouseLocation.y = 0;
+  })
+}
+// 移动视角
+ColouringGame.prototype.moveCamera= function (x,y) {
+  this.context.translate(x, y)
+  this.context.setTransform(0, 0, 0, 0, x, y);
 }
 function dataInfo(Obj,x,y){
   var c=document.createElement("canvas");
@@ -423,9 +579,6 @@ function dataInfo(Obj,x,y){
   }
   num=num/9;
   return parseInt(num);
-}
-ColouringGame.prototype.draw = function () {
-
 }
 ColouringGame.prototype.changeCurrentPartColor = function ({color}) {
   if (!color || !this.currentSelectedPart) {
@@ -595,6 +748,7 @@ class ImageAsset {
       }
       this.loading = true
       this.image = new Image()
+      this.image.crossOrigin = "Anonymous"
       this.image.src = this.url
       this.image.onload = () => {
         this.loading = false
@@ -907,6 +1061,7 @@ class Node {
     this.parent = options.parent || null
     this.children = options.children || []
     this.context = options.context
+    this.children = []
     // this.addEvents()
   }
   on(eventName, callback) {
@@ -922,6 +1077,19 @@ class Node {
   addChild (node) {
     this.children.push(node)
     node.parent = this
+    this.sortByZIndex()
+  }
+  addChilds (nodes) {
+    if (Array.isArray(nodes)) {
+      nodes.forEach(node => {
+        node.parent = this
+      })
+    }
+    this.children.push(...nodes)
+    this.sortByZIndex()
+  }
+  sortByZIndex () {
+    this.children = canvasUtils.sortNodeByZIndex(this.children)
   }
   // addEvents () {
   //   if (this.onClick) {
@@ -1604,5 +1772,17 @@ function getUUid () {
     d = Math.floor(d / 16);
     return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
   });
+}
+// 工具
+const canvasUtils = {
+  // 按y轴层级升序排序
+  sortNodeByZIndex (arr = []) {
+    if (!Array.isArray(arr)) {
+      return []
+    }
+    return arr.sort((a, b) => {
+      return a.zIndex - b.zIndex
+    })
+  }
 }
 export default ColouringGame
