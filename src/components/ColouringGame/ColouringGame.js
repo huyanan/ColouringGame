@@ -13,7 +13,7 @@ class ColouringGame {
     this.init(options)
   }
   // 游戏框架初始化
-  init ({container, width, height, onClickPart, config, debug}) {
+  init ({container, width, height, onClickPart, onAllPartsPainted, config, debug}) {
     // 配置
     this.config = {
       gameColors: {
@@ -70,6 +70,8 @@ class ColouringGame {
     this.currentSelectedPart = null
     // 点击零件
     this.onClickPart = onClickPart
+    // 当所有零件都被上色的回调
+    this.onAllPartsPainted = onAllPartsPainted
     // 渲染对象列表
     this.children = []
     // 追加事件
@@ -87,7 +89,7 @@ class ColouringGame {
         gameData
       })
       let {
-        colors,
+        palette,
         colouringGameDataList
       } = gameData
       this.gameData = gameData;
@@ -98,7 +100,7 @@ class ColouringGame {
 
       // 初始化颜料盘
       this.initPalette({
-        colors
+        palette
       });
 
       // 开始绘制
@@ -145,6 +147,18 @@ class ColouringGame {
         THIS.context.fillStyle= O.color;
         THIS.context.fillRect(O.CONST_BUF_X, O.CONST_BUF_Y, O.w, O.h);
     }
+  }
+  isAllPartsPainted () {
+    let flag = true
+    if (Array.isArray(this.parts)) {
+      this.parts.forEach(part => {
+        if (!part.painted) {
+          flag = false
+          return false
+        }
+      })
+    }
+    return flag
   }
 }
 
@@ -193,6 +207,7 @@ ColouringGame.prototype.createCanvas = function(width, height) {
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
+  // canvas.backgroundColor =
   return canvas
 }
 
@@ -221,7 +236,7 @@ ColouringGame.prototype.createSprite = function ({x, y, w, h, image}) {
   return sprite
 }
 // 创建零件
-ColouringGame.prototype.createPart = function ({name, x, y, w, h, image}) {
+ColouringGame.prototype.createPart = function ({name, x, y, w, h, image, zIndex}) {
   const self = this
   const part = new Part({
     name,
@@ -232,6 +247,7 @@ ColouringGame.prototype.createPart = function ({name, x, y, w, h, image}) {
     image,
     selectedBorderColor: this.config.gameColors.selectedBorderColor,
     context: this.context,
+    zIndex,
     render () {},
     onClick () {
       console.log('当点击零件', {
@@ -239,7 +255,7 @@ ColouringGame.prototype.createPart = function ({name, x, y, w, h, image}) {
       });
       // this.isSelected = true
       self.currentSelectedPart = part
-      this.select();
+      self.currentSelectedPart.select();
       if (typeof self.onClickPart === 'function') {
         self.onClickPart(part)
       }
@@ -412,7 +428,14 @@ ColouringGame.prototype.changeDraw = async function (drawData) {
       // this.drawParts({parts})
       // 批量创建零件精灵
       this.parts = this.createPartsSprite({parts})
-      this.parts = canvasUtils.sortNodeByZIndex(this.parts)
+      this.parts = canvasUtils.sortNodeByZIndex(this.parts, {
+        // 升序
+        order: 'asc'
+      })
+      this.zIndexDescParts = canvasUtils.sortNodeByZIndex(this.parts, {
+        // 降序
+        order: 'desc'
+      })
       this.backplaceSprite.addChilds(this.parts)
       
       console.log('游戏初始化完成', {
@@ -479,7 +502,8 @@ ColouringGame.prototype.createPartsSprite = function ({parts}) {
       partSprite = this.createPart({
         name: partItem.name,
         image: partItem.image,
-        ...partItem.style
+        ...partItem.style,
+        zIndex: partItem.zIndex
       })
       partSpriteList.push(partSprite);
       // console.log('drawBackPlace', {
@@ -537,8 +561,9 @@ ColouringGame.prototype.addEvents = function () {
     var aX=0;
     var aY=0;
     var buf=null;
-    for(var i =0;i<self.parts.length;i++){
-        buf=self.parts[i];
+    // 命中零件按z-index降序查找
+    for(var i =0;i<self.zIndexDescParts.length;i++){
+        buf=self.zIndexDescParts[i];
         console.log(`零件 ${buf.name}`, {
           x,
           y,
@@ -558,15 +583,18 @@ ColouringGame.prototype.addEvents = function () {
           && x<buf.x * self.scale + self.offsetX + buf.width * self.scale
           && y>buf.y * self.scale + self.offsetY
           && y<buf.y * self.scale + self.offsetY + buf.height * self.scale){
-            if(buf.image){
-                aX=x-buf.x;
-                aY=y-buf.y;
-                if(dataInfo(buf,aX,aY)>80){
-                    buf.emit('click')
-                };
-            }else{
-                buf.emit('click')
-            }
+            console.log(`命中了零件 ${buf.name}`, buf);
+            // if(buf.image){
+            //     aX=x-buf.x;
+            //     aY=y-buf.y;
+            //     if(dataInfo(buf,aX,aY)>80){
+            //         buf.emit('click')
+            //     };
+            // }else{
+            //     buf.emit('click')
+            // }
+            buf.emit('click')
+            break
         }
     }
   });
@@ -700,6 +728,13 @@ ColouringGame.prototype.changeCurrentPartColor = function ({color}) {
   this.currentSelectedPart.changeColor({
     color
   });
+  // 判断当前所有的零件是不是都上完色了，并抛出事件
+  if (this.isAllPartsPainted()) {
+    // this.emit('allPartsPainted');
+    if (typeof this.onAllPartsPainted === 'function') {
+      this.onAllPartsPainted();
+    }
+  }
 }
 
 
@@ -708,10 +743,10 @@ ColouringGame.prototype.changeCurrentPartColor = function ({color}) {
  * 初始化颜料盘
  */
 ColouringGame.prototype.initPalette = function ({
-  colors
+  palette
 }) {
   this.palette.addColors({
-    colors
+    colors: palette.colors
   });
 }
 
@@ -1592,6 +1627,7 @@ class Part extends Sprite {
     this.fillColor = null
     this.selectedBorderColor = options.selectedBorderColor || '#000000'
     this.isSelected = false
+    this.painted = false
     this.init()
     this.addEvents()
   }
@@ -1678,6 +1714,7 @@ class Part extends Sprite {
       color: this.fillColor
     })
     this.draw();
+    this.painted = true
   }
   /*创建img数据*/
   changeImageColor ({color}) {
@@ -1770,12 +1807,16 @@ class Border {
 class Color {
   constructor ({hex, opacity, r, g, b, a}) {
     this.hex = hex
-    this.opacity = opacity
+    this.opacity = isNaN(parseFloat(opacity)) ? 1 : opacity 
     this.r = r
     this.g = g
     this.b = b
     this.a = a
     this.init()
+  }
+  // 获取rgba
+  get rgba () {
+    return `rgba(${this.r}, ${this.g}, ${this.b}, ${this.opacity})`
   }
   init () {
     let {hex, opacity, r, g, b, a} = this
@@ -1806,6 +1847,7 @@ class Color {
         this.opacity = typeof a === 'number' ? Math.floor(a / 255) : 1
     }
   }
+  
 }
 // 16进制转10进制
 function hexToDec (hex) {
@@ -1824,7 +1866,7 @@ class Palette {
     this.init()
   }
   init () {
-    this.addColors(this.colors);
+    this.addColors({color: this.colors});
   }
   addColors ({colors}) {
     if (!Array.isArray(colors)) {
@@ -1834,23 +1876,34 @@ class Palette {
       ...colors
     ]
     let colorObj = null
-    const newColorObjList = this.colors.map(color => {
-      if (typeof color === 'string') {
-        colorObj = new Color({hex: color})
-      } else if (typeof color === 'object') {
-        if (color.type === 'hex') {
-          colorObj = new Color({hex: color.value})
-        } else if (color.type === 'rgb'){
-          colorObj = new Color({r: color.r, g: color.g, b: color.b})
-        } else {
-          // 其他颜色类型
-        }
+    let bgColorObj = null
+    const newColorObjList = this.colors.map(colorItem => {
+      colorObj = this.createColorObj(colorItem.color)
+      bgColorObj = this.createColorObj(colorItem.bgColor)
+      return {
+        color: colorObj,
+        bgColor: bgColorObj
       }
-      return colorObj
     })
     this.colorObjList = [
       ...newColorObjList
     ]
+  }
+  createColorObj (color) {
+    let colorObj = null
+    if (typeof color === 'string') {
+      colorObj = new Color({hex: color})
+    } else if (typeof color === 'object') {
+      if (color.type === 'hex') {
+        colorObj = new Color({hex: color.hex, opacity: color.opacity})
+      } else if (color.type === 'rgb'){
+        colorObj = new Color({r: color.r, g: color.g, b: color.b})
+      } else {
+        // 其他颜色类型
+        colorObj = new Color(color)
+      }
+    }
+    return colorObj
   }
 }
 
@@ -1889,11 +1942,16 @@ function getUUid () {
 // 工具
 const canvasUtils = {
   // 按y轴层级升序排序
-  sortNodeByZIndex (arr = []) {
+  sortNodeByZIndex (arr = [], {order='asc'} = {}) {
     if (!Array.isArray(arr)) {
       return []
     }
     return arr.sort((a, b) => {
+      if (order === 'asc') {
+        return a.zIndex - b.zIndex
+      } else if (order === 'desc') {
+        return b.zIndex - a.zIndex
+      }
       return a.zIndex - b.zIndex
     })
   },
