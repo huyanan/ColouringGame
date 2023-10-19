@@ -8,15 +8,18 @@
     <div class="border-view" ref="borderView">
 
     </div>
+    <button @click="onClickGenerateImage">生成图片</button>
+    <!-- 生成图片预览 -->
+    <img class="preview-image" :src="previewImage">
     <div class="color-palette">
       <div
         class="color"
-        v-for="color in colors"
-        :key="color.id"
+        v-for="(colorItem, index) in colors"
+        :key="index"
         :style="{
-          backgroundColor: color.hex,
+          'background-color': colorItem.color.hex,
         }"
-        @click="onClickColor(color)"></div>
+        @click="onClickColor(colorItem.color)"></div>
     </div>
   </div>
 </template>
@@ -33,7 +36,8 @@ export default {
       debug: {
         prevDistance: 0,
         currentDistance: 0,
-      }
+      },
+      previewImage: ''
     }
   },
   mounted () {
@@ -67,8 +71,13 @@ export default {
       console.log('游戏框架初始化完成', {
         colouringGame: this.colouringGame,
       });
+      const comics = gameData.comics;
+      const palette = gameData.palette;
       // 初始化游戏
-      this.colouringGame.initGame(gameData)
+      this.colouringGame.initGame({
+        palette,
+        backplace: comics[0].backplace,
+      })
 
       // 生成颜料盘
       this.initPalette()
@@ -86,7 +95,9 @@ export default {
         color
       })
     },
-
+    onClickGenerateImage () {
+      this.previewImage = this.colouringGame.generateImage()
+    }
   }
 }
 </script>

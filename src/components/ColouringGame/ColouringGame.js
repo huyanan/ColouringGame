@@ -167,6 +167,16 @@ class ColouringGame {
   getParts () {
     return this.parts
   }
+  generateImage () {
+    let scale = this.scale;
+    let offsetX = this.offsetX;
+    let offsetY = this.offsetY;
+    this.scale = 1;
+    this.offsetX = 0;
+    this.offsetY = 0;
+    this.render();
+    return this.canvas.toDataURL();
+  }
 }
 
 // 移动视角
@@ -1897,8 +1907,12 @@ class Palette {
     let colorObj = null
     let bgColorObj = null
     const newColorObjList = this.colors.map(colorItem => {
-      colorObj = this.createColorObj(colorItem.color)
-      bgColorObj = this.createColorObj(colorItem.bgColor)
+      if (typeof colorItem ==='string') {
+        colorObj = this.createColorObj(colorItem)
+      } else if (typeof colorItem === 'object') {
+        colorObj = this.createColorObj(colorItem.color)
+        bgColorObj = this.createColorObj(colorItem.bgColor)
+      }
       return {
         color: colorObj,
         bgColor: bgColorObj
