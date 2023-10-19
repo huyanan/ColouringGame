@@ -90,12 +90,16 @@ class ColouringGame {
       })
       let {
         palette,
-        colouringGameDataList
+        backplace,
+        // colouringGameDataList
       } = gameData
       this.gameData = gameData;
       // 默认选中第一张图
-      if (Array.isArray(colouringGameDataList) && colouringGameDataList.length > 0) {
-        this.changeDraw(colouringGameDataList[0])
+      // if (Array.isArray(colouringGameDataList) && colouringGameDataList.length > 0) {
+      //   this.changeDraw(colouringGameDataList[0])
+      // }
+      if (backplace) {
+        this.changeDraw(backplace)
       }
 
       // 初始化颜料盘
@@ -159,6 +163,9 @@ class ColouringGame {
       })
     }
     return flag
+  }
+  getParts () {
+    return this.parts
   }
 }
 
@@ -236,9 +243,10 @@ ColouringGame.prototype.createSprite = function ({x, y, w, h, image}) {
   return sprite
 }
 // 创建零件
-ColouringGame.prototype.createPart = function ({name, x, y, w, h, image, zIndex}) {
+ColouringGame.prototype.createPart = function ({id, name, x, y, w, h, image, zIndex}) {
   const self = this
   const part = new Part({
+    id,
     name,
     x,
     y,
@@ -362,30 +370,37 @@ ColouringGame.prototype.createPart = function ({name, x, y, w, h, image, zIndex}
       ]
     }
  */
-ColouringGame.prototype.changeDraw = async function (drawData) {
+ColouringGame.prototype.changeDraw = async function (backplace) {
   try {
     let {
       id,
-      backplace,
       parts
-    } = drawData
+    } = backplace
     let imgsInfo = [];
+    let backplaceImgInfo = null
     // 底板
-    let backplaceObj = null
+    // let backplace = this.backplace
+    let backplaceTaskId = getUUid()
     if (backplace) {
-      imgsInfo.push({
+      backplaceImgInfo = {
         id: backplace.id,
+        taskId: backplaceTaskId,
         url: backplace.imageUrl
-      })
+      }
+      imgsInfo.push(backplaceImgInfo)
     }
+    let partImgsInfo = []
     if (Array.isArray(parts)) {
       // 零件
-      imgsInfo.push(...parts.map((partItem) => {
+      partImgsInfo = parts.map((partItem) => {
         return {
+          ...partItem,
           id: partItem.id,
+          taskId: getUUid(),
           url: partItem.imageUrl
         }
-      }))
+      })
+      imgsInfo.push(...partImgsInfo)
     }
     const loadImagesRes = await this.loadAssets({
       imgsInfo,
@@ -407,15 +422,15 @@ ColouringGame.prototype.changeDraw = async function (drawData) {
       // 开始绘制
       // 在结果中找出底板
       const backplaceAsset = loadImagesRes.data.find((item) => {
-        return item.id === backplace.id
+        return item.taskId === backplaceTaskId
       })
       
       backplace.image = backplaceAsset.image
       // 格式化零件数据
       let imgAsset = null;
-      parts.forEach((partItem) => {
+      partImgsInfo.forEach((partItem) => {
         imgAsset = loadImagesRes.data.find((item) => {
-          return item.id === partItem.id
+          return item.taskId === partItem.taskId
         })
         partItem.image = imgAsset.image;
       })
@@ -427,7 +442,7 @@ ColouringGame.prototype.changeDraw = async function (drawData) {
       // 绘制零件
       // this.drawParts({parts})
       // 批量创建零件精灵
-      this.parts = this.createPartsSprite({parts})
+      this.parts = this.createPartsSprite({parts: partImgsInfo})
       this.parts = canvasUtils.sortNodeByZIndex(this.parts, {
         // 升序
         order: 'asc'
@@ -500,6 +515,7 @@ ColouringGame.prototype.createPartsSprite = function ({parts}) {
     let partSprite = null
     parts.forEach((partItem) => {
       partSprite = this.createPart({
+        id: partItem.id,
         name: partItem.name,
         image: partItem.image,
         ...partItem.style,
@@ -837,8 +853,9 @@ class AssetsManager {
     let task = null
     if (Array.isArray(imgsInfo)) {
       imgsInfo.forEach(item => {
-        imgAsset = new ImageAsset({id: item.id, url: item.url})
+        imgAsset = new ImageAsset({id: item.id,taskId: item.taskId, url: item.url})
         task = new Task({
+          id: item.taskId,
           data: imgAsset,
           excutionFunc: imgAsset.load.bind(imgAsset)
         })
@@ -847,7 +864,7 @@ class AssetsManager {
         this.imageList.push(imgAsset)
         this.imageMap[item.id] = imgAsset
       })
-
+      
       taskListRes = await taskList.doTasks()
       if (taskListRes.success) {
         res = {
@@ -877,8 +894,9 @@ class ImageAsset {
   static get type() {
     return 'image'
   }
-  constructor({id, url}) {
+  constructor({id, taskId, url}) {
     this.id = id
+    this.taskId = taskId
     this.url = url
     this.image = null // 图片对象 Image
     this.task = null;
@@ -1621,6 +1639,7 @@ class ImageDataManager {
 class Part extends Sprite {
   constructor(options) {
     super(options)
+    this.id = options.id || getUUid()
     this.image = options.image
     // this.width = options.width
     // this.height = options.height
