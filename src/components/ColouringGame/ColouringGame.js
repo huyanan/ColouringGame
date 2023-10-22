@@ -27,6 +27,8 @@ class ColouringGame {
     this.debug = debug
     // 创建画布
     this.canvas = this.createCanvas(width, height)
+    this.canvas.style.width='250px'
+    this.canvas.style.height='250px'
     // canvas2d context
     this.context = this.canvas.getContext('2d')
     // 坐标偏移
@@ -38,8 +40,9 @@ class ColouringGame {
       y: 0
     }
     // 缩放
-    this.prevScale = 1
+    this.canvasScale = 0.5
     this.scale = 1
+    this.prevScale = this.scale
     this.maxScale = this.config.maxScale || 8; // 缩放最大倍数（缩放比率倍数）
     this.minScale = this.config.minScale || 0.4; // 缩放最小倍数（缩放比率倍数）
     this.mousePos = {
@@ -76,6 +79,9 @@ class ColouringGame {
     this.children = []
     // 追加事件
     this.addEvents()
+  }
+  get computeScale () {
+    return this.scale * this.canvasScale
   }
   //
   /**
@@ -210,11 +216,29 @@ ColouringGame.prototype.zoomOut= function () {
 }
 
 ColouringGame.prototype.zoom = function () {
-  this.offsetX = this.mousePos.x - ((this.mousePos.x - this.offsetX) * this.scale) / this.prevScale;
-  this.offsetY = this.mousePos.y - ((this.mousePos.y - this.offsetY) * this.scale) / this.prevScale;
+  console.log('zoom before', {
+    mouseX: this.mousePos.x, 
+    offsetX: this.offsetX, 
+    offsetY: this.offsetY, 
+    scale: this.scale, 
+    canvasScale: this.canvasScale,
+    prevScale: this.prevScale,
+    scaleStep: this.scaleStep
+  })  ;
+  this.offsetX = this.mousePos.x  / this.canvasScale - ((this.mousePos.x / this.canvasScale - this.offsetX) * this.scale) / this.prevScale;
+  this.offsetY = this.mousePos.y  / this.canvasScale - ((this.mousePos.y / this.canvasScale - this.offsetY) * this.scale) / this.prevScale;
   this.prevScale = this.scale;
   this.curOffset.x = this.offsetX;
   this.curOffset.y = this.offsetY;
+  console.log('zoom after', {
+    mouseX: this.mousePos.x, 
+    offsetX: this.offsetX, 
+    offsetY: this.offsetY, 
+    scale: this.scale, 
+    canvasScale: this.canvasScale,
+    prevScale: this.prevScale,
+    scaleStep: this.scaleStep
+  })  ;
 }
 
 
@@ -582,8 +606,8 @@ ColouringGame.prototype.addEvents = function () {
   const self = this;
   this.canvas.addEventListener("click",function(e){
     var event=typeof window.event!="undefined"?window.event:typeof e!="undefined"?e:event;
-    var x =event.offsetX;
-    var y =event.offsetY;
+    var x =event.offsetX / self.canvasScale;
+    var y =event.offsetY / self.canvasScale;
     var aX=0;
     var aY=0;
     var buf=null;
@@ -674,8 +698,8 @@ ColouringGame.prototype.addEvents = function () {
       // })
       // 设置画布平移
       // self.moveCamera(offsetX, offsetY)
-      self.offsetX = self.curOffset.x + (x - self.mouseLocation.x)
-      self.offsetY = self.curOffset.y + (y - self.mouseLocation.y)
+      self.offsetX = self.curOffset.x + (x - self.mouseLocation.x) / self.canvasScale
+      self.offsetY = self.curOffset.y + (y - self.mouseLocation.y) / self.canvasScale
 
       
       if (self.debug) {
