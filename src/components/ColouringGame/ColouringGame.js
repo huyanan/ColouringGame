@@ -678,6 +678,7 @@ ColouringGame.prototype.addEvents = function () {
   })
   this.canvas.addEventListener("touchmove", function (e) {
     var event=typeof window.event!="undefined"?window.event:typeof e!="undefined"?e:event;
+
     // 判断如果是一个触摸点，则为移动，两个触摸点则为缩放
     if (event.touches.length === 1) {
       let x =event.touches[0].clientX;
@@ -705,6 +706,14 @@ ColouringGame.prototype.addEvents = function () {
       if (self.debug) {
         self.debug.currentDistance = 100
       }
+      console.log('move', {
+        x,
+        y,
+        offsetX: self.offsetX,
+        offsetY: self.offsetY,
+        scale: self.scale,
+        buf
+      });
     } else if (event.touches.length === 2) {
       // 得到
       let currentDistanceBetweenTwoTouchPoints = canvasUtils.getDistance(event.touches[0].clientX, event.touches[0].clientY, event.touches[1].clientX, event.touches[1].clientY)
@@ -726,7 +735,8 @@ ColouringGame.prototype.addEvents = function () {
     
     console.log('鼠标开始移动', {
       x: self.mouseLocation.x,
-      y: self.mouseLocation.y
+      y: self.mouseLocation.y,
+      event
     });
   })
   this.canvas.addEventListener("touchend", function (e) {
