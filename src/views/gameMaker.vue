@@ -92,6 +92,8 @@ export default {
     return {
       canvas: null,
       ctx: null,
+      filePath: '',
+      partsMapFilePath: '',
       activeIndex: '0',
       nodeTreeData: [
         // {
@@ -144,13 +146,22 @@ export default {
       defaultProps: {
         children: 'children',
         label: 'label'
-      }
+      },
+      lastJsonStr: ''
     }
   },
   watch: {
     nodeTreeData: {
-      handler (val) {
-        this.save();
+      handler (newVal, oldVal) {
+
+        const {comicJsonStr} = this.getSaveJson(newVal)
+        // const oldValJson = this.getSaveJson(oldVal)
+        if (comicJsonStr != this.lastJsonStr) {
+          console.log('nodeTreeData change');
+          this.sort();
+          this.save();
+          this.lastJsonStr = comicJsonStr
+        }
       },
       deep: true
     }
@@ -191,7 +202,7 @@ export default {
       
     },
     initEvent () {
-      this.$eventBus.$on('openedFile', this.openComic)
+      this.$eventBus.$on('openedFile', this.handleOpendFile)
       // 监听鼠标移动事件
       // this.canvas.onmousemove = (e) => {
       //   // const { offsetX, offsetY }
@@ -238,10 +249,11 @@ export default {
 
       }
     },
-    // handleOpendFile (file) {
-    //   console.log('handleOpendFile', file);
-    //   this.openComic(file)
-    // },
+    handleOpendFile (file) {
+      console.log('handleOpendFile', file);
+      // this.openComic(file)
+      this.getFile(file)
+    },
     getFile(selectFile){
       // 提交
       this.$axios.post("/api/maker/readComic", {
@@ -257,12 +269,15 @@ export default {
       const json = file.json;
       const comic = this.createComic(json)
       this.filePath = file.filePath
+      this.partsMapFilePath = this.filePath.replace(/\.\w+/, '_parts.json')
       this.nodeTreeData = [comic]
       this.saveLastComicFile();
     },
     // 保存上次修改的漫画
     saveLastComicFile (comicFile) {
-      localStorage.setItem('lastComicFile', JSON.stringify(comicFile))
+      if (comicFile) {
+        localStorage.setItem('lastComicFile', JSON.stringify(comicFile))
+      }
     },
     createComic (data) {
       let comicOptions = {
@@ -315,6 +330,13 @@ export default {
             }
           },
           {
+            label: '复制零件',
+            command: 'copyPart',
+            onClick: ({menuItem, data}) => {
+              data.copyPart()
+            }
+          },
+          {
             label: '删除',
             command: 'delete',
             onClick: ({menuItem, data}) => {
@@ -337,11 +359,19 @@ export default {
     createPart () {
 
     },
-    save () {
-      // this.nodeTreeData.forEach(node => {
+    // 排序
+    sort () {
+      this.nodeTreeData.sort((node1, node2) => {
+        return node1.zIndex - node2.zIndex
+      })
+      this.nodeTreeData.forEach((comic) => {
+        if (comic.sortChildren) {
+          comic.sortChildren()
+        }
+      })
+    },
 
-      // })
-      // const comic = this.nodeTreeData[0]
+    getSaveJson (tree) {
       let comicList = {}
       function getChildrenJson (nodeList) {
         return nodeList.map((node) => {
@@ -359,17 +389,89 @@ export default {
         })
         
       }
-      comicList = getChildrenJson(this.nodeTreeData)
+      comicList = getChildrenJson(tree)
       let comicJson = comicList[0]
       
       
-      const jsonStr = JSON.stringify(comicJson, null, "\t");
-      console.log('save', jsonStr)
+      const comicJsonStr = JSON.stringify(comicJson, null, "\t");
+      return {
+        comicJsonStr,
+        comicJson,
+      }
+    },
+    getFilteredAttrNode (node) {
+      let nodeJson = {}
+      if (node) {
+        Object.keys(node).forEach(key => {
+          if (key === 'parent' || key === 'comic') {
+
+          } else if (key === 'children'){
+            // nodeJson[key] = getChildrenJson(node[key])
+          } else {
+            nodeJson[key] = node[key]
+          }
+        })
+      }
+      return nodeJson
+    },
+    save () {
+
+      const {comicJsonStr, comicJson} = this.getSaveJson(this.nodeTreeData)
+      console.log('save', comicJsonStr)
       this.$axios.post('/api/maker/save', {
         filePath: this.filePath,
-        json: jsonStr
+        json: comicJsonStr
       }).then((res) => {
         this.saveLastComicFile({filePath: this.filePath, json: comicJson})
+      })
+
+      this.savePartsMap(comicJson);
+    },
+    // 获取零件图鉴保存json
+    getPartsMapJson (comicJson) {
+      const self = this;
+      let partsMapJson = {
+
+      }
+
+      function handleChildren (parent, children) {
+        if (Array.isArray(children)) {
+          children.forEach((item) => {
+            partsMapJson[item.id] = self.getFilteredAttrNode(item)
+            if (parent && parent.type === 'part') {
+              partsMapJson[item.id].parentId = parent.id
+            }
+            partsMapJson[item.id].imageUrl = item.drawImage
+            partsMapJson[item.id].disabledImgUrl = item.disabledImage
+            partsMapJson[item.id].borderImgUrl = item.borderImage
+
+            if (item.children && item.children.length > 0) {
+              partsMapJson[item.id].childrenIds = item.children.map((item) => {
+                return item.id
+              })
+              handleChildren(partsMapJson[item.id], item.children)
+            }
+          })
+        }
+      }
+
+      handleChildren(comicJson, comicJson.children)
+      const partsMapJsonStr = JSON.stringify(partsMapJson, null, "\t");
+      return {
+        partsMapJson,
+        partsMapJsonStr
+      }
+    },
+    // 打平数据结构，得到零件图鉴
+    savePartsMap (comicJson) {
+      console.log('savePartsMap', comicJson)
+      const {partsMapJson,partsMapJsonStr} = this.getPartsMapJson(comicJson)
+      console.log('savePartsMap', partsMapJson, partsMapJsonStr)
+      this.$axios.post('/api/maker/save', {
+        filePath: this.partsMapFilePath,
+        json: partsMapJsonStr
+      }).then((res) => {
+        
       })
     },
     showConversationMenu (options) {
@@ -386,9 +488,17 @@ export default {
     handleDragLeave () {},
     handleDragOver () {},
     handleDragEnd () {},
-    handleDrop () {},
-    allowDrag () {},
-    allowDrop () {}
+    handleDrop (a,b,c) {
+      console.log('handleDrop', {
+        a,b,c
+      })
+    },
+    allowDrag () {
+      return true;
+    },
+    allowDrop () {
+      return true;
+    }
   }
 }
 </script>

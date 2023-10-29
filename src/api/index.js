@@ -1,6 +1,6 @@
 import axios from 'axios';
 let instance = axios.create({
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: 'http://127.0.0.1:7000',
     headers: {'content-type': 'application/x-www-form-urlencoded'},
     
 }); 

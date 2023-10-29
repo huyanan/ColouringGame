@@ -50,7 +50,7 @@ import axios from 'axios'
             submit() {
                 this.$emit('submit')
                 // 提交
-                this.$axios.post("http://127.0.0.1:3000/api/maker/createComic", {
+                this.$axios.post("/api/maker/createComic", {
                     dirPath: this.dirPath,
                     fileName: this.fileName
                 })
@@ -62,7 +62,7 @@ import axios from 'axios'
                     })
                 })
 
-                // this.$axios.get("http://127.0.0.1:3000/users")
+                // this.$axios.get("/users")
                 // .then(res => {
                 //     console.log(res)
                 // })

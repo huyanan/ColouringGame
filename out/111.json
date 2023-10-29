@@ -1,0 +1,102 @@
+{
+	"id": "76a66b5d-eb26-4eab-9e07-4dd50e5566d1",
+	"type": "comic",
+	"label": "漫画",
+	"name": "漫画",
+	"filename": "",
+	"assetsBaseUrl": "http://cdn.hyn.com/colouring_game/sleep/",
+	"assetsRealPath": "E:\\work\\cdn\\colouring_game\\sleep",
+	"filepath": "",
+	"children": [
+		{
+			"id": "dee1a3f8-702b-4f9b-af2f-fc195a0b8868",
+			"type": "part",
+			"label": "零件label",
+			"name": "零件名称",
+			"description": "零件描述",
+			"canFill": false,
+			"style": {
+				"x": 0,
+				"y": 0,
+				"w": 0,
+				"h": 0
+			},
+			"zIndex": 1,
+			"isDefaultDisabled": false,
+			"isShowBorderAfterPainted": false,
+			"children": [],
+			"drawImage": "",
+			"drawImageObj": null,
+			"borderImage": "",
+			"disabledImage": ""
+		},
+		{
+			"id": "9ac1146e-5e9f-473b-96e0-8948b2f4a078",
+			"type": "part",
+			"label": "零件label",
+			"name": "零件名称",
+			"description": "零件描述",
+			"canFill": false,
+			"style": {
+				"x": 0,
+				"y": 0,
+				"w": 0,
+				"h": 0
+			},
+			"zIndex": 2,
+			"isDefaultDisabled": false,
+			"isShowBorderAfterPainted": false,
+			"children": [
+				{
+					"id": "8eda0810-d4f9-43b3-a386-621a27542633",
+					"type": "part",
+					"label": "零件label",
+					"name": "零件名称",
+					"description": "零件描述",
+					"canFill": false,
+					"style": {
+						"x": 0,
+						"y": 0,
+						"w": 571.053,
+						"h": 249.494
+					},
+					"zIndex": "2",
+					"isDefaultDisabled": false,
+					"isShowBorderAfterPainted": false,
+					"children": [],
+					"drawImage": "http://cdn.hyn.com/colouring_game/sleep/月亮1.png",
+					"drawImageObj": {},
+					"borderImage": "",
+					"disabledImage": ""
+				},
+				{
+					"id": "65f1a407-f492-4d32-b557-587c74ef2b34",
+					"type": "part",
+					"label": "零件label",
+					"name": "零件名称",
+					"description": "零件描述",
+					"canFill": false,
+					"style": {
+						"x": 0,
+						"y": 0,
+						"w": 722,
+						"h": 874
+					},
+					"zIndex": 3,
+					"isDefaultDisabled": false,
+					"isShowBorderAfterPainted": false,
+					"children": [],
+					"drawImage": "http://cdn.hyn.com/colouring_game/sleep/狗1.png",
+					"drawImageObj": {},
+					"borderImage": "",
+					"disabledImage": ""
+				}
+			],
+			"drawImage": "",
+			"drawImageObj": null,
+			"borderImage": "",
+			"disabledImage": ""
+		}
+	],
+	"zIndex": 1
+}

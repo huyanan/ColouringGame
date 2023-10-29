@@ -16,6 +16,10 @@
                     <el-form-item label="id">
                         <el-input v-model="node.id" placeholder="请输入id"></el-input>
                     </el-form-item>
+                    <!-- uuid -->
+                    <el-form-item label="uuid">
+                        <el-input v-model="node.uuid" placeholder="请输入uuid"></el-input>
+                    </el-form-item>
                     <!-- 名字 -->
                     <el-form-item label="name">
                         <el-input v-model="node.name" placeholder="请输入名字"></el-input>
@@ -54,6 +58,10 @@
                     <el-form-item label="id">
                         <el-input v-model="node.id" placeholder="请输入id"></el-input>
                     </el-form-item>
+                    <!-- uuid -->
+                    <el-form-item label="uuid">
+                        <el-input v-model="node.uuid" placeholder="请输入uuid"></el-input>
+                    </el-form-item>
                     <!-- 名字 -->
                     <el-form-item label="name">
                         <el-input v-model="node.name" placeholder="请输入名字"></el-input>
@@ -89,7 +97,11 @@
                     </el-form-item>
                     <!-- 层级  -->
                     <el-form-item label="z-index">
-                        <el-input type="number" v-model="node.icon" placeholder="请输入zIndex"></el-input>
+                        <el-input type="number" v-model="node.zIndex" placeholder="请输入zIndex"></el-input>
+                    </el-form-item>
+                    <!-- 涂色后是否展示边框  -->
+                    <el-form-item label="默认展示禁用图片">
+                        <el-checkbox v-model="node.isDefaultDisabled"></el-checkbox>
                     </el-form-item>
                     <!-- 涂色后是否展示边框  -->
                     <el-form-item label="涂色后展示边框">
@@ -102,10 +114,12 @@
                     </el-form-item>
                     <!-- 边框图片  -->
                     <el-form-item label="边框图片">
+                        <input type="file" placeholder="涂色图片" accept="image" @change="onSelectBorderImage" />
                         <el-input v-model="node.borderImage" placeholder="边框图片"></el-input>
                     </el-form-item>
                     <!-- 禁用图片  -->
                     <el-form-item label="禁用图片">
+                        <input type="file" placeholder="涂色图片" accept="image" @change="onSelectDisabledImage" />
                         <el-input v-model="node.disabledImage" placeholder="禁用图片"></el-input>
                     </el-form-item>
                 </el-form>
@@ -118,6 +132,7 @@
 export default {
     data () {
         return {
+            isShow: false,
             node: {
 
                 // id = options.id || uuidv4();
@@ -151,7 +166,13 @@ export default {
             this.$eventBus.$on('showAttrPanel', this.show);
         },
         onSelectDrawImage (event) {
-            this.node.drawImage = event.target.files[0].name;
+            this.node._drawImage = event.target.files[0].name;
+        },
+        onSelectBorderImage (event) {
+            this.node._borderImage = event.target.files[0].name;
+        },
+        onSelectDisabledImage (event) {
+            this.node._disabledImage = event.target.files[0].name;
         },
         show (node) {
             this.isShow = true;
